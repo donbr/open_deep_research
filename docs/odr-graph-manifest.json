@@ -1,0 +1,356 @@
+{
+  "repo": {
+    "url": "https://github.com/langchain-ai/open_deep_research",
+    "path": "src/open_deep_research",
+    "branch": "main",
+    "commit": "b419df8d33b4f39ff5b2a34527bb6b85d0ede5d0",
+    "analyzed_at": "2025-01-25T15:30:00Z"
+  },
+  "graph": {
+    "state_keys": [
+      {
+        "name": "messages",
+        "type": "list[MessageLikeRepresentation]",
+        "rw": "R/W",
+        "notes": "Main conversation thread",
+        "reducer": "MessagesState default"
+      },
+      {
+        "name": "supervisor_messages",
+        "type": "list[MessageLikeRepresentation]",
+        "rw": "R/W",
+        "notes": "Supervisor conversation with override_reducer",
+        "reducer": "override_reducer"
+      },
+      {
+        "name": "researcher_messages",
+        "type": "list[MessageLikeRepresentation]",
+        "rw": "R/W",
+        "notes": "Individual researcher conversations",
+        "reducer": "operator.add"
+      },
+      {
+        "name": "research_brief",
+        "type": "str",
+        "rw": "R/W",
+        "notes": "Structured research question",
+        "reducer": "default"
+      },
+      {
+        "name": "raw_notes",
+        "type": "list[str]",
+        "rw": "R/W",
+        "notes": "Unprocessed research findings with override_reducer",
+        "reducer": "override_reducer"
+      },
+      {
+        "name": "notes",
+        "type": "list[str]",
+        "rw": "R/W",
+        "notes": "Processed research findings with override_reducer",
+        "reducer": "override_reducer"
+      },
+      {
+        "name": "compressed_research",
+        "type": "str",
+        "rw": "W",
+        "notes": "Synthesized findings from individual researchers",
+        "reducer": "default"
+      },
+      {
+        "name": "research_iterations",
+        "type": "int",
+        "rw": "R/W",
+        "notes": "Supervisor iteration counter",
+        "reducer": "default"
+      },
+      {
+        "name": "tool_call_iterations",
+        "type": "int",
+        "rw": "R/W",
+        "notes": "Researcher tool call counter",
+        "reducer": "default"
+      },
+      {
+        "name": "final_report",
+        "type": "str",
+        "rw": "W",
+        "notes": "Final formatted report",
+        "reducer": "default"
+      }
+    ],
+    "nodes": [
+      {
+        "name": "clarify_with_user",
+        "reads": ["messages"],
+        "writes": ["messages"],
+        "file": "deep_researcher.py:60-115",
+        "function": "async def clarify_with_user(state: AgentState, config: RunnableConfig)",
+        "purpose": "Analyze user messages and ask clarifying questions if research scope unclear"
+      },
+      {
+        "name": "write_research_brief",
+        "reads": ["messages"],
+        "writes": ["research_brief", "supervisor_messages"],
+        "file": "deep_researcher.py:118-175",
+        "function": "async def write_research_brief(state: AgentState, config: RunnableConfig)",
+        "purpose": "Transform user messages into structured research brief and initialize supervisor"
+      },
+      {
+        "name": "supervisor",
+        "reads": ["supervisor_messages"],
+        "writes": ["supervisor_messages", "research_iterations"],
+        "file": "deep_researcher.py:178-223",
+        "function": "async def supervisor(state: SupervisorState, config: RunnableConfig)",
+        "purpose": "Lead research supervisor that plans strategy and delegates to researchers"
+      },
+      {
+        "name": "supervisor_tools",
+        "reads": ["supervisor_messages", "research_iterations"],
+        "writes": ["supervisor_messages", "raw_notes", "notes"],
+        "file": "deep_researcher.py:225-349",
+        "function": "async def supervisor_tools(state: SupervisorState, config: RunnableConfig)",
+        "purpose": "Execute tools called by supervisor including research delegation and thinking"
+      },
+      {
+        "name": "researcher",
+        "reads": ["researcher_messages"],
+        "writes": ["researcher_messages", "tool_call_iterations"],
+        "file": "deep_researcher.py:365-424",
+        "function": "async def researcher(state: ResearcherState, config: RunnableConfig)",
+        "purpose": "Individual researcher conducting focused research on specific topics"
+      },
+      {
+        "name": "researcher_tools",
+        "reads": ["researcher_messages", "tool_call_iterations"],
+        "writes": ["researcher_messages"],
+        "file": "deep_researcher.py:435-509",
+        "function": "async def researcher_tools(state: ResearcherState, config: RunnableConfig)",
+        "purpose": "Execute tools called by researcher including search and strategic thinking"
+      },
+      {
+        "name": "compress_research",
+        "reads": ["researcher_messages"],
+        "writes": ["compressed_research", "raw_notes"],
+        "file": "deep_researcher.py:511-585",
+        "function": "async def compress_research(state: ResearcherState, config: RunnableConfig)",
+        "purpose": "Compress and synthesize research findings into concise structured summary"
+      },
+      {
+        "name": "final_report_generation",
+        "reads": ["messages", "research_brief", "notes"],
+        "writes": ["final_report", "messages", "notes"],
+        "file": "deep_researcher.py:607-697",
+        "function": "async def final_report_generation(state: AgentState, config: RunnableConfig)",
+        "purpose": "Generate final comprehensive research report with retry logic for token limits"
+      }
+    ],
+    "edges": [
+      {
+        "source": "START",
+        "target": "clarify_with_user",
+        "condition": "always",
+        "line_ref": "deep_researcher.py:714"
+      },
+      {
+        "source": "clarify_with_user",
+        "target": "write_research_brief",
+        "condition": "need_clarification=false",
+        "line_ref": "deep_researcher.py:77"
+      },
+      {
+        "source": "clarify_with_user",
+        "target": "END",
+        "condition": "need_clarification=true",
+        "line_ref": "deep_researcher.py:106-109"
+      },
+      {
+        "source": "write_research_brief",
+        "target": "research_supervisor",
+        "condition": "always",
+        "line_ref": "deep_researcher.py:163-174"
+      },
+      {
+        "source": "supervisor",
+        "target": "supervisor_tools",
+        "condition": "always",
+        "line_ref": "deep_researcher.py:217-222"
+      },
+      {
+        "source": "supervisor_tools",
+        "target": "supervisor",
+        "condition": "continue_research=true",
+        "line_ref": "deep_researcher.py:346-348"
+      },
+      {
+        "source": "supervisor_tools",
+        "target": "END",
+        "condition": "research_complete OR max_iterations OR no_tool_calls",
+        "line_ref": "deep_researcher.py:255-262"
+      },
+      {
+        "source": "research_supervisor",
+        "target": "final_report_generation",
+        "condition": "research_complete",
+        "line_ref": "deep_researcher.py:715"
+      },
+      {
+        "source": "researcher",
+        "target": "researcher_tools",
+        "condition": "always",
+        "line_ref": "deep_researcher.py:418-423"
+      },
+      {
+        "source": "researcher_tools",
+        "target": "researcher",
+        "condition": "continue_research=true",
+        "line_ref": "deep_researcher.py:505-508"
+      },
+      {
+        "source": "researcher_tools",
+        "target": "compress_research",
+        "condition": "max_iterations OR research_complete OR no_tool_calls",
+        "line_ref": "deep_researcher.py:498-502"
+      },
+      {
+        "source": "compress_research",
+        "target": "END",
+        "condition": "always",
+        "line_ref": "deep_researcher.py:602"
+      },
+      {
+        "source": "final_report_generation",
+        "target": "END",
+        "condition": "always",
+        "line_ref": "deep_researcher.py:716"
+      }
+    ],
+    "loops": [
+      {
+        "name": "supervisor_loop",
+        "nodes": ["supervisor", "supervisor_tools"],
+        "exit_condition": "iterations >= max_researcher_iterations || ResearchComplete || no_tool_calls",
+        "iteration_variable": "research_iterations",
+        "max_iterations_config": "max_researcher_iterations"
+      },
+      {
+        "name": "researcher_loop",
+        "nodes": ["researcher", "researcher_tools"],
+        "exit_condition": "tool_call_iterations >= max_react_tool_calls || ResearchComplete || no_tool_calls",
+        "iteration_variable": "tool_call_iterations",
+        "max_iterations_config": "max_react_tool_calls"
+      }
+    ]
+  },
+  "tools": {
+    "builtin": [
+      {
+        "name": "think_tool",
+        "file": "utils.py:219-244",
+        "function": "def think_tool(reflection: str) -> str",
+        "purpose": "Strategic reflection tool for research planning and decision-making"
+      },
+      {
+        "name": "ConductResearch",
+        "file": "state.py:15-19",
+        "class": "class ConductResearch(BaseModel)",
+        "purpose": "Structured tool for research delegation to sub-agents"
+      },
+      {
+        "name": "ResearchComplete",
+        "file": "state.py:21-22",
+        "class": "class ResearchComplete(BaseModel)",
+        "purpose": "Signal tool to indicate research completion"
+      }
+    ],
+    "search": [
+      {
+        "name": "tavily_search",
+        "file": "utils.py:43-136",
+        "function": "async def tavily_search(queries, max_results, topic, config)",
+        "purpose": "Fetch and summarize search results from Tavily search API",
+        "metadata": {"type": "search"}
+      },
+      {
+        "name": "web_search_20250305",
+        "file": "utils.py:540-546",
+        "descriptor": "static tool descriptor",
+        "purpose": "Anthropic's native web search with usage limits",
+        "constraints": {"max_uses": 5}
+      },
+      {
+        "name": "web_search_preview",
+        "file": "utils.py:548-550",
+        "descriptor": "static tool descriptor",
+        "purpose": "OpenAI's web search preview functionality"
+      }
+    ],
+    "mcp": [
+      {
+        "client": "MultiServerMCPClient",
+        "transport": "streamable_http",
+        "tools": "configured via mcp_config.tools",
+        "file": "utils.py:500-501",
+        "auth": "OAuth token exchange via utils.py:352-383",
+        "error_handling": "MCP-specific wrapper via utils.py:385-447"
+      }
+    ]
+  },
+  "integration_points": [
+    {
+      "surface": "tool_loading",
+      "file": "utils.py:569-597",
+      "pattern": "get_all_tools()",
+      "best_practice": "config-driven injection with collision detection",
+      "collision_handling": "utils.py:510-514 with warnings.warn()"
+    },
+    {
+      "surface": "mcp_integration",
+      "file": "utils.py:449-524",
+      "pattern": "load_mcp_tools()",
+      "best_practice": "auth wrapper + collision detection",
+      "auth_flow": "OAuth token exchange via fetch_tokens()"
+    },
+    {
+      "surface": "model_configuration",
+      "file": "configuration.py:236-247",
+      "pattern": "Configuration.from_runnable_config()",
+      "best_practice": "environment variable fallbacks",
+      "multi_model": "different models for summarization, research, compression, final_report"
+    },
+    {
+      "surface": "state_management",
+      "file": "state.py:55-60",
+      "pattern": "override_reducer",
+      "best_practice": "typed state with custom reducers",
+      "semantics": "supports both override ({'type': 'override'}) and additive updates"
+    },
+    {
+      "surface": "error_handling",
+      "file": "utils.py:665-785",
+      "pattern": "provider-specific token limit detection",
+      "best_practice": "progressive truncation with model token limits",
+      "providers": ["openai", "anthropic", "google/gemini"]
+    }
+  ],
+  "configuration": {
+    "model_fields": [
+      "summarization_model",
+      "research_model",
+      "compression_model",
+      "final_report_model"
+    ],
+    "limits": {
+      "max_concurrent_research_units": {"default": 5, "max": 20},
+      "max_researcher_iterations": {"default": 6, "max": 10},
+      "max_react_tool_calls": {"default": 10, "max": 30},
+      "max_structured_output_retries": {"default": 3, "max": 10}
+    },
+    "search_apis": ["anthropic", "openai", "tavily", "none"],
+    "mcp_config": {
+      "url": "MCP server URL",
+      "tools": "list of tool names to enable",
+      "auth_required": "boolean for OAuth requirement"
+    }
+  }
+}

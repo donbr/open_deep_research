@@ -1,0 +1,232 @@
+# Open Deep Research - MCP Tool Integration Prototype Plan
+# Rapid prototyping framework for adding new MCP tools without graph surgery
+
+prototype:
+  scope_rule: "Only modify files under src/open_deep_research; prefer config-based injection."
+  goal: "Expose one new MCP tool and wire it into researcher flow without graph surgery."
+
+  # Example MCP Server Configuration
+  server:
+    name: demo_tools
+    transport: streamable_http
+    auth: "optional"  # Set to "required" for production OAuth flow
+    endpoint: "https://localhost:3000/mcp"
+
+    # Demo tool specification
+    tools:
+      - name: classify_text
+        description: "Categorize and label text content for research organization"
+        input_schema:
+          type: object
+          properties:
+            text:
+              type: string
+              description: "Text content to classify"
+          required: [text]
+        output_schema:
+          type: object
+          properties:
+            label:
+              type: string
+              description: "Classification label"
+            confidence:
+              type: number
+              description: "Confidence score (0.0-1.0)"
+            categories:
+              type: array
+              items:
+                type: string
+              description: "List of relevant categories"
+
+# Integration Wiring (leverages existing patterns)
+client_wiring:
+  config_surface: "configuration.py:214-233 where MCPConfig is defined"
+  discovery: "existing MultiServerMCPClient path via utils.py:500-501"
+  selection: "respect existing tool-name filter; avoid name collisions via utils.py:510-514"
+  authentication: "OAuth token exchange via utils.py:352-383 if auth_required=true"
+  error_handling: "MCP-specific wrapper via utils.py:385-447"
+
+# Required Code Changes (minimal surgery)
+code_changes:
+  configuration:
+    file: "src/open_deep_research/configuration.py"
+    changes:
+      - line_range: "27-30"
+        description: "Add classify_text to MCPConfig.tools default list"
+        before: 'tools: Optional[List[str]] = Field(default=None, optional=True)'
+        after: 'tools: Optional[List[str]] = Field(default=["classify_text"], optional=True)'
+
+  prompts:
+    file: "src/open_deep_research/prompts.py"
+    changes:
+      - line_range: "146-152"
+        description: "Update research_system_prompt to mention classify_text availability"
+        before: |
+          <Available Tools>
+          You have access to two main tools:
+          1. **tavily_search**: For conducting web searches to gather information
+          2. **think_tool**: For reflection and strategic planning during research
+        after: |
+          <Available Tools>
+          You have access to these main tools:
+          1. **tavily_search**: For conducting web searches to gather information
+          2. **think_tool**: For reflection and strategic planning during research
+          3. **classify_text**: For categorizing and labeling text content
+
+  # No changes needed to utils.py - existing patterns handle new tools
+  tool_discovery:
+    file: "src/open_deep_research/utils.py"
+    existing_patterns:
+      - "load_mcp_tools() automatically discovers tools from server"
+      - "Collision detection at lines 510-514 prevents name conflicts"
+      - "Auth wrapper at lines 385-447 handles MCP errors"
+      - "get_all_tools() at lines 569-597 assembles complete toolkit"
+
+# Validation & Testing
+acceptance:
+  checks:
+    - name: "MCP Server Connection"
+      description: "Client successfully connects to MCP server at configured URL"
+      validation: "MultiServerMCPClient instantiation succeeds"
+
+    - name: "Tool Discovery"
+      description: "classify_text tool is discovered and available"
+      validation: "classify_text appears in get_all_tools() output"
+      command: |
+        python -c "
+        from open_deep_research.utils import get_all_tools
+        import asyncio
+        async def test():
+            config = {'configurable': {'mcp_config': {'url': 'http://localhost:3000', 'tools': ['classify_text']}}}
+            tools = await get_all_tools(config)
+            assert any(t.name == 'classify_text' for t in tools), 'classify_text tool not found'
+        asyncio.run(test())
+        "
+
+    - name: "No Tool Collisions"
+      description: "classify_text does not conflict with existing tool names"
+      validation: "No warnings.warn() calls for tool name conflicts"
+      existing_tools: ["think_tool", "tavily_search", "web_search", "ConductResearch", "ResearchComplete"]
+
+    - name: "Researcher Integration"
+      description: "Researcher node can invoke classify_text tool"
+      validation: "Tool call appears in researcher_messages state"
+      state_key: "researcher_messages"
+
+    - name: "State Updates"
+      description: "Tool outputs are properly captured and processed"
+      validation: "ToolMessage with classify_text results in message history"
+      compression_check: "Tool outputs included in compressed_research synthesis"
+
+    - name: "Iteration Tracking"
+      description: "tool_call_iterations increments correctly"
+      validation: "Counter at deep_researcher.py:422 increments after tool use"
+      limit_enforcement: "Respects max_react_tool_calls configuration"
+
+# Deployment Workflow
+rollout:
+  development:
+    environment: "local stdio/http with mock MCP server"
+    server_setup: |
+      # Mock MCP server for development
+      docker run -p 3000:3000 mock-mcp-server:latest
+    config: |
+      # .env.local
+      MCP_SERVER_URL=http://localhost:3000/mcp
+      MCP_AUTH_REQUIRED=false
+    testing: |
+      # Start LangGraph dev server
+      uvx langgraph dev --allow-blocking
+
+      # Test in LangGraph Studio
+      # URL: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
+      # Input: {"messages": [{"role": "human", "content": "Classify this text: AI is transforming healthcare"}]}
+
+  production:
+    environment: "authenticated MCP server with retry/backoff"
+    auth_flow: "OAuth token exchange via Supabase tokens"
+    server_setup: |
+      # Production MCP server with auth
+      export MCP_SERVER_URL=https://mcp-production.example.com/mcp
+      export MCP_AUTH_REQUIRED=true
+    config: |
+      # .env.production
+      GET_API_KEYS_FROM_CONFIG=true
+      SUPABASE_KEY=your-supabase-key
+      SUPABASE_URL=your-supabase-url
+    deployment: |
+      # Deploy to LangGraph Platform
+      langgraph deploy --env-file .env.production
+
+# Integration Architecture
+architecture:
+  tool_flow:
+    1: "researcher node calls get_all_tools(config) at deep_researcher.py:384"
+    2: "get_all_tools() calls load_mcp_tools() at utils.py:594"
+    3: "load_mcp_tools() creates MultiServerMCPClient at utils.py:500"
+    4: "Client fetches tools from MCP server via HTTP transport"
+    5: "Tools wrapped with auth handler via utils.py:521"
+    6: "classify_text added to researcher's tool arsenal"
+    7: "researcher_tools node executes tool calls at deep_researcher.py:474-479"
+    8: "Tool outputs captured in ToolMessage format"
+    9: "Results flow to compress_research for synthesis"
+
+  state_management:
+    researcher_messages: "Contains tool calls and ToolMessage responses"
+    tool_call_iterations: "Incremented at deep_researcher.py:422"
+    compressed_research: "Synthesized output includes tool results"
+    raw_notes: "Unprocessed tool outputs for final report"
+
+  error_handling:
+    connection_failures: "Empty list returned from load_mcp_tools()"
+    auth_failures: "ToolException with user-friendly message"
+    tool_errors: "Wrapped in execute_tool_safely() at deep_researcher.py:427"
+    name_collisions: "warnings.warn() with skip behavior"
+
+# Example Usage Patterns
+usage_examples:
+  - name: "Text Classification During Research"
+    scenario: "User asks to research AI applications in healthcare"
+    workflow: |
+      1. Supervisor delegates research task via ConductResearch
+      2. Researcher uses tavily_search to find healthcare AI content
+      3. Researcher calls think_tool to analyze search results
+      4. Researcher uses classify_text to categorize findings by medical domain
+      5. Researcher continues search based on classification insights
+      6. compress_research synthesizes all findings with classifications
+      7. Final report includes categorized insights
+
+  - name: "Content Organization"
+    scenario: "Large research corpus needs categorization"
+    workflow: |
+      1. Multiple parallel researchers gather diverse content
+      2. Each researcher uses classify_text to label their findings
+      3. Compression phase organizes content by classification labels
+      4. Final report structured around content categories
+
+# Monitoring & Observability
+monitoring:
+  langsmith_integration:
+    - "Tool calls tagged with 'langsmith:nostream' at deep_researcher.py:396"
+    - "MCP tool usage appears in experiment traces"
+    - "Error patterns visible in LangSmith dashboards"
+
+  logging_points:
+    - "MCP client connection success/failure"
+    - "Tool discovery and collision warnings"
+    - "Authentication token refresh events"
+    - "Tool execution duration and success rates"
+
+# Scaling Considerations
+scaling:
+  concurrency: "MCP tools respect max_concurrent_research_units limit (1-20)"
+  rate_limiting: "Server-side rate limits may impact parallel research"
+  caching: "Consider tool output caching for expensive classification operations"
+  fallbacks: "Graceful degradation when MCP server unavailable"
+
+# Security Considerations
+security:
+  authentication: "OAuth token exchange prevents unauthorized access"
+  input_validation: "Tool schemas enforce input constraints"
+  output_sanitization: "Tool outputs processed through ToolMessage wrapper"
+  network_security: "HTTPS transport required for production MCP servers"
