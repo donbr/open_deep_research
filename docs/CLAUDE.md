@@ -130,18 +130,6 @@ prototype:
 * Provide specific file paths and line numbers for all claims (e.g., `deep_researcher.py:700-719`)
 * Preserve the analysis as permanent documentation rather than ephemeral conversation content
 
-**Critical Accuracy Notes (apply these corrections to avoid common mistakes):**
-
-1. **Tool name collisions**: MCP tools with naming conflicts are **not silently ignored** - they trigger `warnings.warn()` and are skipped with explicit warnings (`utils.py:510-514`)
-
-2. **Web search metadata**: Native search tool descriptors are **static constants** (e.g., `"web_search_20250305"`, `"max_uses": 5`), not dynamic provider discovery (`utils.py:540-546`)
-
-3. **Iteration counter ownership**: The `tool_call_iterations` counter is incremented by the `researcher` node (`deep_researcher.py:421-423`), not by `researcher_tools` - be precise about which node owns which state mutations
-
-4. **Observability scope**: LangSmith integration uses **tags only** (`"langsmith:nostream"`) with no custom tracing/metrics hooks - avoid overstating observability capabilities (`deep_researcher.py:395-399, 530-531, 630-631`)
-
-5. **State reducer behavior**: The `override_reducer` allows both replacement via `{"type": "override", "value": [...]}` and additive updates via direct list append - clearly distinguish these semantics (`state.py:55-60`)
-
 **Evidence Discipline:**
 * Quote **exact line spans** for all architectural claims
 * Distinguish between **static tool descriptors** vs **dynamic tool discovery**
