@@ -138,3 +138,16 @@ print(asyncio.run(get_all_tools(config)))
 - **Cost Estimation**: Deep Research Bench evaluation costs $20-$100 depending on model selection
 - **Current Benchmark**: 0.4309 RACE score on Deep Research Bench leaderboard (#6 ranking)
 - **Memory Growth**: `raw_notes` accumulation can grow large; compression pipeline mitigates this
+
+## Technical Documentation
+For detailed architectural analysis and integration patterns, see:
+- **Complete Technical Analysis**: [`docs/odr-analysis-2025-01-25.md`](docs/odr-analysis-2025-01-25.md) - Deep dive into graph architecture, state management, and integration points
+- **Machine-Readable Graph Structure**: [`docs/odr-graph-manifest.json`](docs/odr-graph-manifest.json) - JSON manifest of nodes, edges, state keys, and tools
+- **MCP Integration Framework**: [`docs/odr-mcp-prototype.yaml`](docs/odr-mcp-prototype.yaml) - Rapid prototype plan for MCP tool integration
+
+## Legacy Implementations
+Two alternative implementations in `src/legacy/` provide different architectural approaches:
+1. **Plan-and-Execute** (`graph.py`) - Sequential processing with human-in-the-loop
+2. **Multi-Agent** (`multi_agent.py`) - Supervisor-researcher architecture with parallel processing
+
+These are less performant than the current implementation but offer alternative patterns for research automation.
